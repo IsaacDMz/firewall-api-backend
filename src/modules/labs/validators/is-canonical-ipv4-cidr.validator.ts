@@ -1,4 +1,5 @@
 import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator'
+import { validateCanonicalIpv4Network } from '../../../common/network/ipv4-cidr'
 
 export function IsCanonicalIpv4Cidr(validationOptions?: ValidationOptions): PropertyDecorator {
   return (target, propertyName) => {
@@ -9,37 +10,14 @@ export function IsCanonicalIpv4Cidr(validationOptions?: ValidationOptions): Prop
       options: validationOptions,
       validator: {
         validate(value: unknown): boolean {
-          return typeof value === 'string' && isCanonicalIpv4Cidr(value)
+          return validateCanonicalIpv4Network(value).valid
         },
         defaultMessage(args: ValidationArguments): string {
-          return `${args.property} must be an IPv4 network in CIDR notation`
+          const result = validateCanonicalIpv4Network(args.value)
+          const suggestion = !result.valid && result.suggestedSubnet ? `; use ${result.suggestedSubnet}` : ''
+          return `${args.property} must be an IPv4 network in canonical CIDR notation with a prefix from /1 to /32${suggestion}`
         },
       },
     })
   }
-}
-
-function isCanonicalIpv4Cidr(value: string): boolean {
-  const [address, prefixText, ...rest] = value.split('/')
-
-  if (rest.length > 0 || !address || !prefixText || !/^\d{1,2}$/.test(prefixText)) {
-    return false
-  }
-
-  const prefix = Number(prefixText)
-  const octets = address.split('.')
-
-  if (prefix > 32 || octets.length !== 4 || octets.some((octet) => !/^(0|[1-9]\d{0,2})$/.test(octet))) {
-    return false
-  }
-
-  const values = octets.map(Number)
-
-  if (values.some((octet) => octet > 255)) {
-    return false
-  }
-
-  const numericAddress = values.reduce((result, octet) => (result << 8) | octet, 0) >>> 0
-  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
-  return (numericAddress & mask) >>> 0 === numericAddress
 }

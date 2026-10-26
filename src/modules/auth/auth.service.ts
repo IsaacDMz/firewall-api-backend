@@ -54,7 +54,7 @@ export class AuthService {
   }
 
   async login(data: LoginDto): Promise<TokenPair> {
-    const user = await this.usersService.findByUsername(data.username)
+    const user = await this.usersService.findByEmail(data.email)
     const isValidPassword = user ? await this.verifyPassword(user.passwordHash, data.password) : false
 
     if (!user || !isValidPassword) {

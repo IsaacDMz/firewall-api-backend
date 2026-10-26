@@ -19,7 +19,7 @@ const user: User = {
 
 describe('AuthService', () => {
   let service: AuthService
-  let usersService: jest.Mocked<Pick<UsersService, 'createPendingProfessor' | 'findById' | 'findByUsername'>>
+  let usersService: jest.Mocked<Pick<UsersService, 'createPendingProfessor' | 'findByEmail' | 'findById'>>
   let refreshSessionsRepository: {
     create: jest.Mock
     findOne: jest.Mock
@@ -33,7 +33,7 @@ describe('AuthService', () => {
     usersService = {
       createPendingProfessor: jest.fn(),
       findById: jest.fn(),
-      findByUsername: jest.fn(),
+      findByEmail: jest.fn(),
     }
     refreshSessionsRepository = {
       create: jest.fn((data) => data),
@@ -83,18 +83,18 @@ describe('AuthService', () => {
   })
 
   it('rejects an inactive user after valid credentials', async () => {
-    usersService.findByUsername.mockResolvedValue({ ...user, isActive: false, passwordHash: await argon2.hash('strong-password') })
+    usersService.findByEmail.mockResolvedValue({ ...user, isActive: false, passwordHash: await argon2.hash('strong-password') })
 
-    await expect(service.login({ username: user.username, password: 'strong-password' })).rejects.toMatchObject({
+    await expect(service.login({ email: user.email, password: 'strong-password' })).rejects.toMatchObject({
       status: HttpStatus.FORBIDDEN,
       response: expect.objectContaining({ code: 'ACCOUNT_INACTIVE' }),
     })
   })
 
   it('issues tokens for an active user with valid credentials', async () => {
-    usersService.findByUsername.mockResolvedValue({ ...user, passwordHash: await argon2.hash('strong-password') })
+    usersService.findByEmail.mockResolvedValue({ ...user, passwordHash: await argon2.hash('strong-password') })
 
-    await expect(service.login({ username: user.username, password: 'strong-password' })).resolves.toEqual({
+    await expect(service.login({ email: user.email, password: 'strong-password' })).resolves.toEqual({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     })
@@ -102,9 +102,9 @@ describe('AuthService', () => {
   })
 
   it('rejects an incorrect password', async () => {
-    usersService.findByUsername.mockResolvedValue({ ...user, passwordHash: await argon2.hash('strong-password') })
+    usersService.findByEmail.mockResolvedValue({ ...user, passwordHash: await argon2.hash('strong-password') })
 
-    await expect(service.login({ username: user.username, password: 'incorrect-password' })).rejects.toMatchObject({
+    await expect(service.login({ email: user.email, password: 'incorrect-password' })).rejects.toMatchObject({
       status: HttpStatus.UNAUTHORIZED,
       response: expect.objectContaining({ code: 'AUTH_INVALID_CREDENTIALS' }),
     })

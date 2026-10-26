@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer'
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator'
 import { LabStatus } from '../../../database/entities/lab.entity'
 import { IsCanonicalIpv4Cidr } from '../validators/is-canonical-ipv4-cidr.validator'
 
@@ -12,11 +12,8 @@ export class CreateLabDto {
   @MaxLength(120)
   name!: string
 
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(80)
-  block!: string
+  @IsUUID('4')
+  blockId!: string
 
   @Transform(trim)
   @IsCanonicalIpv4Cidr()

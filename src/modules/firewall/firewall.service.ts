@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { validateCanonicalIpv4Network } from '../../common/network/ipv4-cidr'
 import { SshCommandError, SshCommandRunner, SshConnectionError, SshTimeoutError } from './ssh-command-runner'
 
 type FirewallOperation = 'block' | 'unblock'
@@ -20,7 +21,7 @@ export class FirewallService {
   }
 
   private async execute(operation: FirewallOperation, subnet: string, labId: number): Promise<void> {
-    if (!isCanonicalIpv4Cidr(subnet) || !Number.isSafeInteger(labId) || labId < 1) {
+    if (!validateCanonicalIpv4Network(subnet).valid || !Number.isSafeInteger(labId) || labId < 1) {
       throw new BadGatewayException({ message: 'Firewall request is invalid', code: 'FIREWALL_COMMAND_FAILED' })
     }
 
@@ -45,29 +46,4 @@ export class FirewallService {
       throw new BadGatewayException({ message: 'Firewall command failed', code: 'FIREWALL_COMMAND_FAILED' })
     }
   }
-}
-
-function isCanonicalIpv4Cidr(value: string): boolean {
-  const [address, prefixText, ...rest] = value.split('/')
-
-  if (rest.length > 0 || !address || !prefixText || !/^\d{1,2}$/.test(prefixText)) {
-    return false
-  }
-
-  const prefix = Number(prefixText)
-  const octets = address.split('.')
-
-  if (prefix > 32 || octets.length !== 4 || octets.some((octet) => !/^(0|[1-9]\d{0,2})$/.test(octet))) {
-    return false
-  }
-
-  const values = octets.map(Number)
-
-  if (values.some((octet) => octet > 255)) {
-    return false
-  }
-
-  const numericAddress = values.reduce((result, octet) => (result << 8) | octet, 0) >>> 0
-  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
-  return (numericAddress & mask) >>> 0 === numericAddress
 }

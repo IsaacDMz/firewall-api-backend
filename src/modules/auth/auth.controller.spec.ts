@@ -4,6 +4,8 @@ import { jest } from '@jest/globals'
 import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
+import { ActiveUserGuard } from '../users/guards/active-user.guard'
+import { UsersService } from '../users/users.service'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 
@@ -12,7 +14,12 @@ describe('AuthController', () => {
     const authService = { register: jest.fn() }
     const module = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [AuthService, { provide: JwtService, useValue: {} }],
+      providers: [
+        AuthService,
+        ActiveUserGuard,
+        { provide: JwtService, useValue: {} },
+        { provide: UsersService, useValue: {} },
+      ],
     })
       .overrideProvider(AuthService)
       .useValue(authService)
