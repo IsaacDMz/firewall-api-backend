@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../../common/auth/current-user.decorator'
 import { AuthenticatedUser } from '../../common/auth/authenticated-user.interface'
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard'
+import { ActiveUserGuard } from '../users/guards/active-user.guard'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
@@ -38,7 +39,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtAccessGuard, ActiveUserGuard)
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser): Promise<PublicUser> {
     return this.authService.me(user.id)

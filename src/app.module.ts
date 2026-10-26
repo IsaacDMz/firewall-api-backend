@@ -4,11 +4,13 @@ import { ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { ConfigService } from '@nestjs/config'
 import { AuthModule } from './modules/auth/auth.module'
+import { BlocksModule } from './modules/blocks/blocks.module'
 import { LabsModule } from './modules/labs/labs.module'
 import { HistoryModule } from './modules/history/history.module'
 import authConfig from './config/auth.config'
 import firewallConfig from './config/firewall.config'
 import { History } from './database/entities/history.entity'
+import { Block } from './database/entities/block.entity'
 import { Lab } from './database/entities/lab.entity'
 import { RefreshSession } from './database/entities/refresh-session.entity'
 import { User } from './database/entities/user.entity'
@@ -32,7 +34,7 @@ import { envValidationSchema } from './config/env.validation'
         username: config.getOrThrow<string>('database.username'),
         password: config.getOrThrow<string>('database.password'),
         database: config.getOrThrow<string>('database.name'),
-        entities: [User, Lab, History, RefreshSession],
+        entities: [User, Block, Lab, History, RefreshSession],
         synchronize: false,
       }),
     }),
@@ -43,6 +45,7 @@ import { envValidationSchema } from './config/env.validation'
       },
     ]),
     AuthModule,
+    BlocksModule,
     LabsModule,
     HistoryModule,
   ],

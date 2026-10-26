@@ -6,14 +6,16 @@ import { Roles } from '../../common/auth/roles.decorator'
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { UserRole } from '../../database/entities/user.entity'
+import { ActiveUserGuard } from '../users/guards/active-user.guard'
 import { CreateLabDto } from './dto/create-lab.dto'
 import { UpdateLabStatusDto } from './dto/update-lab-status.dto'
+import { UpdateLabDto } from './dto/update-lab.dto'
 import { LabsService } from './labs.service'
 import { LabResponse } from './labs.types'
 
 @ApiTags('labs')
 @ApiBearerAuth()
-@UseGuards(JwtAccessGuard, RolesGuard)
+@UseGuards(JwtAccessGuard, ActiveUserGuard, RolesGuard)
 @Controller('labs')
 export class LabsController {
   constructor(private readonly labsService: LabsService) {}
@@ -28,6 +30,12 @@ export class LabsController {
   @Post()
   create(@Body() data: CreateLabDto): Promise<LabResponse> {
     return this.labsService.create(data)
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateLabDto): Promise<LabResponse> {
+    return this.labsService.update(id, data)
   }
 
   @Roles(UserRole.PROFESSOR, UserRole.ADMIN)
