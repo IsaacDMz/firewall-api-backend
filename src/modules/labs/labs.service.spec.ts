@@ -43,15 +43,19 @@ function createService(options: { conflict?: Lab | null; blockFailure?: Error; u
       if (subnet === lab.subnet && options.unblockOldFailure) throw options.unblockOldFailure
     }),
   }
-  const service = new LabsService(labsRepository as never, blocksRepository as never, {} as never, firewallService as never, {} as never)
+  const auditService = { record: jest.fn(async () => undefined), recordInTransaction: jest.fn(async () => undefined) }
+  const service = new LabsService(labsRepository as never, blocksRepository as never, {} as never, firewallService as never, {} as never, auditService as never)
   return { service, labsRepository, firewallService }
 }
+
+const actor = { id: '0aabce83-c7eb-4df6-a509-5722fc599339', username: 'admin', role: 'ADMIN' as const }
+const requestId = '1aabce83-c7eb-4df6-a509-5722fc599339'
 
 describe('LabsService', () => {
   it('preserves the subnet when a PATCH omits it', async () => {
     const { service, labsRepository, firewallService } = createService()
 
-    await expect(service.update(lab.id, { name: 'Lab Renomeado' })).resolves.toMatchObject({ subnet: lab.subnet })
+    await expect(service.update(lab.id, { name: 'Lab Renomeado' }, actor, requestId)).resolves.toMatchObject({ subnet: lab.subnet })
     expect(labsRepository.save).toHaveBeenCalledWith(expect.objectContaining({ subnet: lab.subnet, name: 'Lab Renomeado' }))
     expect(firewallService.blockInternet).not.toHaveBeenCalled()
     expect(firewallService.unblockInternet).not.toHaveBeenCalled()
@@ -60,7 +64,7 @@ describe('LabsService', () => {
   it('replaces firewall rules before persisting a blocked lab subnet change', async () => {
     const { service, labsRepository, firewallService } = createService()
 
-    await service.update(lab.id, { subnet: '192.168.11.0/24' })
+    await service.update(lab.id, { subnet: '192.168.11.0/24' }, actor, requestId)
 
     expect(firewallService.blockInternet).toHaveBeenCalledWith('192.168.11.0/24', lab.id)
     expect(firewallService.unblockInternet).toHaveBeenCalledWith('192.168.10.0/24', lab.id)
@@ -70,7 +74,7 @@ describe('LabsService', () => {
   it('rejects an overlapping subnet before changing the firewall', async () => {
     const { service, labsRepository, firewallService } = createService({ conflict: { ...lab, id: 2 } })
 
-    await expect(service.update(lab.id, { subnet: '192.168.10.0/25' })).rejects.toMatchObject({ response: { code: 'LAB_SUBNET_OVERLAP' } })
+    await expect(service.update(lab.id, { subnet: '192.168.10.0/25' }, actor, requestId)).rejects.toMatchObject({ response: { code: 'LAB_SUBNET_OVERLAP' } })
     expect(labsRepository.save).not.toHaveBeenCalled()
     expect(firewallService.blockInternet).not.toHaveBeenCalled()
   })
@@ -78,7 +82,7 @@ describe('LabsService', () => {
   it('does not persist a subnet change when blocking the new subnet fails', async () => {
     const { service, labsRepository, firewallService } = createService({ blockFailure: new Error('firewall unavailable') })
 
-    await expect(service.update(lab.id, { subnet: '192.168.11.0/24' })).rejects.toThrow('firewall unavailable')
+    await expect(service.update(lab.id, { subnet: '192.168.11.0/24' }, actor, requestId)).rejects.toThrow('firewall unavailable')
     expect(labsRepository.save).not.toHaveBeenCalled()
     expect(firewallService.unblockInternet).not.toHaveBeenCalled()
   })
@@ -86,7 +90,7 @@ describe('LabsService', () => {
   it('compensates the new firewall rule when removing the old rule fails', async () => {
     const { service, labsRepository, firewallService } = createService({ unblockOldFailure: new Error('old rule removal failed') })
 
-    await expect(service.update(lab.id, { subnet: '192.168.11.0/24' })).rejects.toThrow('old rule removal failed')
+    await expect(service.update(lab.id, { subnet: '192.168.11.0/24' }, actor, requestId)).rejects.toThrow('old rule removal failed')
     expect(labsRepository.save).not.toHaveBeenCalled()
     expect(firewallService.unblockInternet).toHaveBeenLastCalledWith('192.168.11.0/24', lab.id)
   })

@@ -23,7 +23,7 @@ export class Lab {
   @JoinColumn({ name: 'block_id', foreignKeyConstraintName: 'FK_labs_block' })
   block!: Block
 
-  @Column({ type: 'cidr' })
+  @Column({ type: 'varchar', length: 18 })
   subnet!: string
 
   @Column({ type: 'enum', enum: LabStatus, enumName: 'lab_status', default: LabStatus.BLOQUEADO })

@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer'
 import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator'
 import { LabStatus } from '../../../database/entities/lab.entity'
-import { IsCanonicalIpv4Cidr } from '../validators/is-canonical-ipv4-cidr.validator'
+import { IsIpv4Cidr } from '../validators/is-ipv4-cidr.validator'
 
 const trim = ({ value }: { value: unknown }): unknown => (typeof value === 'string' ? value.trim() : value)
 
@@ -16,7 +16,7 @@ export class CreateLabDto {
   blockId!: string
 
   @Transform(trim)
-  @IsCanonicalIpv4Cidr()
+  @IsIpv4Cidr()
   subnet!: string
 
   @IsOptional()

@@ -39,10 +39,9 @@ describe('FirewallService', () => {
     })
   })
 
-  it('rejects a non-canonical subnet without reaching SSH', async () => {
-    await expect(service.blockInternet('192.168.10.37/24', 12)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'FIREWALL_COMMAND_FAILED' }),
-    })
-    expect(commandRunner.run).not.toHaveBeenCalled()
+  it('keeps a valid host address in the controlled command', async () => {
+    await service.blockInternet('192.168.10.37/24', 12)
+
+    expect(commandRunner.run).toHaveBeenCalledWith('/usr/bin/sudo -n /usr/local/sbin/labguard-firewall block 192.168.10.37/24 12 eth0')
   })
 })

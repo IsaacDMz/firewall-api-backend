@@ -1,6 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { validateCanonicalIpv4Network } from '../../common/network/ipv4-cidr'
+import { validateIpv4Cidr } from '../../common/network/ipv4-cidr'
 import { SshCommandError, SshCommandRunner, SshConnectionError, SshTimeoutError } from './ssh-command-runner'
 
 type FirewallOperation = 'block' | 'unblock'
@@ -21,7 +21,7 @@ export class FirewallService {
   }
 
   private async execute(operation: FirewallOperation, subnet: string, labId: number): Promise<void> {
-    if (!validateCanonicalIpv4Network(subnet).valid || !Number.isSafeInteger(labId) || labId < 1) {
+    if (!validateIpv4Cidr(subnet).valid || !Number.isSafeInteger(labId) || labId < 1) {
       throw new BadGatewayException({ message: 'Firewall request is invalid', code: 'FIREWALL_COMMAND_FAILED' })
     }
 

@@ -13,7 +13,8 @@ async function bootstrap() {
   app.enableCors({
     origin: config.getOrThrow<string[]>('app.corsOrigins'),
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    exposedHeaders: ['X-Request-Id'],
   })
   app.setGlobalPrefix('api')
   app.use(helmet())

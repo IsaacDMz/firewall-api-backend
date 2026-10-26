@@ -1,6 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { Roles } from '../../common/auth/roles.decorator'
+import { CurrentUser } from '../../common/auth/current-user.decorator'
+import { AuthenticatedUser } from '../../common/auth/authenticated-user.interface'
+import { RequestId } from '../../common/http/request-id.decorator'
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { UserRole } from '../../database/entities/user.entity'
@@ -31,20 +34,20 @@ export class BlocksController {
 
   @Roles(UserRole.ADMIN)
   @Post()
-  create(@Body() data: CreateBlockDto): Promise<BlockResponse> {
-    return this.blocksService.create(data)
+  create(@Body() data: CreateBlockDto, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<BlockResponse> {
+    return this.blocksService.create(data, user, requestId)
   }
 
   @Roles(UserRole.ADMIN)
   @Patch(':id')
-  update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() data: UpdateBlockDto): Promise<BlockResponse> {
-    return this.blocksService.update(id, data)
+  update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() data: UpdateBlockDto, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<BlockResponse> {
+    return this.blocksService.update(id, data, user, requestId)
   }
 
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
-  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<void> {
-    return this.blocksService.remove(id)
+  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<void> {
+    return this.blocksService.remove(id, user, requestId)
   }
 }

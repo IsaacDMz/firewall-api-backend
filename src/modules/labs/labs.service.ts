@@ -6,6 +6,7 @@ import { Block } from '../../database/entities/block.entity'
 import { Lab, LabStatus } from '../../database/entities/lab.entity'
 import { FirewallService } from '../firewall/firewall.service'
 import { HistoryService } from '../history/history.service'
+import { AuditService } from '../audit/audit.service'
 import { CreateLabDto } from './dto/create-lab.dto'
 import { UpdateLabStatusDto } from './dto/update-lab-status.dto'
 import { UpdateLabDto } from './dto/update-lab.dto'
@@ -19,6 +20,7 @@ export class LabsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly firewallService: FirewallService,
     private readonly historyService: HistoryService,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(): Promise<LabResponse[]> {
@@ -26,30 +28,34 @@ export class LabsService {
     return labs.map((lab) => this.toResponse(lab))
   }
 
-  async create(data: CreateLabDto): Promise<LabResponse> {
+  async create(data: CreateLabDto, user: AuthenticatedUser, requestId: string): Promise<LabResponse> {
     const status = data.status ?? LabStatus.BLOQUEADO
     await this.getBlock(data.blockId)
     await this.ensureSubnetAvailable(data.subnet)
 
     try {
       if (status === LabStatus.BLOQUEADO) {
-        return await this.dataSource.transaction(async (manager) => {
+        const response = await this.dataSource.transaction(async (manager) => {
           const labs = manager.getRepository(Lab)
           const lab = await labs.save(labs.create({ name: data.name, blockId: data.blockId, subnet: data.subnet, status }))
           await this.firewallService.blockInternet(lab.subnet, lab.id)
           return this.toResponse(await labs.findOneOrFail({ where: { id: lab.id }, relations: { block: true } }))
         })
+        await this.auditService.record({ actor: user, action: 'LAB_CREATED', resourceType: 'LAB', resourceId: response.id, requestId, details: { name: response.name, blockId: data.blockId, subnet: response.subnet, status: response.status } })
+        return response
       }
 
       const lab = this.labsRepository.create({ name: data.name, blockId: data.blockId, subnet: data.subnet, status })
       const saved = await this.labsRepository.save(lab)
-      return this.toResponse(await this.labsRepository.findOneOrFail({ where: { id: saved.id }, relations: { block: true } }))
+      const response = this.toResponse(await this.labsRepository.findOneOrFail({ where: { id: saved.id }, relations: { block: true } }))
+      await this.auditService.record({ actor: user, action: 'LAB_CREATED', resourceType: 'LAB', resourceId: response.id, requestId, details: { name: response.name, blockId: data.blockId, subnet: response.subnet, status: response.status } })
+      return response
     } catch (error) {
       this.handleUniqueViolation(error)
     }
   }
 
-  async update(id: number, data: UpdateLabDto): Promise<LabResponse> {
+  async update(id: number, data: UpdateLabDto, user: AuthenticatedUser, requestId: string): Promise<LabResponse> {
     const lab = await this.labsRepository.findOne({ where: { id }, relations: { block: true } })
 
     if (!lab) {
@@ -88,7 +94,9 @@ export class LabsService {
         blockId: data.blockId ?? lab.blockId,
         subnet,
       })
-      return this.toResponse(await this.labsRepository.findOneOrFail({ where: { id: updated.id }, relations: { block: true } }))
+      const response = this.toResponse(await this.labsRepository.findOneOrFail({ where: { id: updated.id }, relations: { block: true } }))
+      await this.auditService.record({ actor: user, action: 'LAB_UPDATED', resourceType: 'LAB', resourceId: id, requestId, details: { before: { name: lab.name, blockId: lab.blockId, subnet: lab.subnet }, after: { name: response.name, blockId: updated.blockId, subnet: response.subnet } } })
+      return response
     } catch (error) {
       if (firewallChanged) {
         await this.compensateFirewallSubnetChange(lab.subnet, subnet, lab.id, true)
@@ -97,7 +105,7 @@ export class LabsService {
     }
   }
 
-  async updateStatus(id: number, data: UpdateLabStatusDto, user: AuthenticatedUser): Promise<LabResponse> {
+  async updateStatus(id: number, data: UpdateLabStatusDto, user: AuthenticatedUser, requestId: string): Promise<LabResponse> {
     const lab = await this.labsRepository.findOne({ where: { id }, relations: { block: true } })
 
     if (!lab) {
@@ -124,6 +132,16 @@ export class LabsService {
         lab,
         previousStatus,
         newStatus: data.status,
+        requestId,
+      })
+
+      await this.auditService.recordInTransaction(manager, {
+        actor: user,
+        action: 'LAB_STATUS_CHANGED',
+        resourceType: 'LAB',
+        resourceId: lab.id,
+        requestId,
+        details: { previousStatus, newStatus: data.status },
       })
 
       return updated
@@ -171,7 +189,7 @@ export class LabsService {
   }
 
   private async ensureSubnetAvailable(subnet: string, currentLabId?: number): Promise<void> {
-    const query = this.labsRepository.createQueryBuilder('lab').where('lab.subnet && CAST(:subnet AS cidr)', { subnet })
+    const query = this.labsRepository.createQueryBuilder('lab').where('CAST(lab.subnet AS cidr) && CAST(:subnet AS cidr)', { subnet })
 
     if (currentLabId !== undefined) {
       query.andWhere('lab.id != :currentLabId', { currentLabId })

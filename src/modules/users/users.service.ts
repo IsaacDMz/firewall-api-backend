@@ -2,6 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User, UserRole } from '../../database/entities/user.entity'
+import { AuthenticatedUser } from '../../common/auth/authenticated-user.interface'
+import { AuditService } from '../audit/audit.service'
 
 type PendingProfessor = {
   username: string
@@ -11,7 +13,10 @@ type PendingProfessor = {
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectRepository(User) private readonly usersRepository: Repository<User>) {}
+  constructor(
+    @InjectRepository(User) private readonly usersRepository: Repository<User>,
+    private readonly auditService: AuditService,
+  ) {}
 
   async createPendingProfessor(data: PendingProfessor): Promise<User> {
     const user = this.usersRepository.create({
@@ -39,8 +44,8 @@ export class UsersService {
     return this.usersRepository.find({ order: { username: 'ASC' } })
   }
 
-  async setActivation(id: string, isActive: boolean, actorId: string): Promise<User> {
-    if (!isActive && id === actorId) {
+  async setActivation(id: string, isActive: boolean, actor: AuthenticatedUser, requestId: string): Promise<User> {
+    if (!isActive && id === actor.id) {
       throw new ForbiddenException({ message: 'Users cannot deactivate their own account', code: 'SELF_DEACTIVATION_NOT_ALLOWED' })
     }
 
@@ -55,10 +60,12 @@ export class UsersService {
     }
 
     user.isActive = isActive
-    return this.usersRepository.save(user)
+    const updated = await this.usersRepository.save(user)
+    await this.auditService.record({ actor, action: 'USER_ACTIVATION_CHANGED', resourceType: 'USER', resourceId: id, requestId, details: { username: user.username, previousIsActive: !isActive, isActive } })
+    return updated
   }
 
-  async promoteToAdmin(id: string): Promise<User> {
+  async promoteToAdmin(id: string, actor: AuthenticatedUser, requestId: string): Promise<User> {
     const user = await this.findById(id)
 
     if (!user) {
@@ -70,6 +77,8 @@ export class UsersService {
     }
 
     user.role = UserRole.ADMIN
-    return this.usersRepository.save(user)
+    const updated = await this.usersRepository.save(user)
+    await this.auditService.record({ actor, action: 'USER_PROMOTED_TO_ADMIN', resourceType: 'USER', resourceId: id, requestId, details: { username: user.username, previousRole: UserRole.PROFESSOR, role: UserRole.ADMIN } })
+    return updated
   }
 }

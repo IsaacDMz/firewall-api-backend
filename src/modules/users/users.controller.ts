@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../../common/auth/current-user.decorator'
+import { RequestId } from '../../common/http/request-id.decorator'
 import { AuthenticatedUser } from '../../common/auth/authenticated-user.interface'
 import { Roles } from '../../common/auth/roles.decorator'
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard'
@@ -30,14 +31,15 @@ export class UsersController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() data: UpdateUserActivationDto,
     @CurrentUser() user: AuthenticatedUser,
+    @RequestId() requestId: string,
   ): Promise<PublicUser> {
-    return this.toPublicUser(await this.usersService.setActivation(id, data.isActive, user.id))
+    return this.toPublicUser(await this.usersService.setActivation(id, data.isActive, user, requestId))
   }
 
   @Roles(UserRole.ADMIN)
   @Patch(':id/promote-admin')
-  async promoteToAdmin(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<PublicUser> {
-    return this.toPublicUser(await this.usersService.promoteToAdmin(id))
+  async promoteToAdmin(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<PublicUser> {
+    return this.toPublicUser(await this.usersService.promoteToAdmin(id, user, requestId))
   }
 
   private toPublicUser(user: User): PublicUser {

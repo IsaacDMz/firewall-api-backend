@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../../common/auth/current-user.decorator'
+import { RequestId } from '../../common/http/request-id.decorator'
 import { AuthenticatedUser } from '../../common/auth/authenticated-user.interface'
 import { Roles } from '../../common/auth/roles.decorator'
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard'
@@ -28,19 +29,19 @@ export class LabsController {
 
   @Roles(UserRole.ADMIN)
   @Post()
-  create(@Body() data: CreateLabDto): Promise<LabResponse> {
-    return this.labsService.create(data)
+  create(@Body() data: CreateLabDto, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<LabResponse> {
+    return this.labsService.create(data, user, requestId)
   }
 
   @Roles(UserRole.ADMIN)
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateLabDto): Promise<LabResponse> {
-    return this.labsService.update(id, data)
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateLabDto, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<LabResponse> {
+    return this.labsService.update(id, data, user, requestId)
   }
 
   @Roles(UserRole.PROFESSOR, UserRole.ADMIN)
   @Patch(':id/status')
-  updateStatus(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateLabStatusDto, @CurrentUser() user: AuthenticatedUser): Promise<LabResponse> {
-    return this.labsService.updateStatus(id, data, user)
+  updateStatus(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateLabStatusDto, @CurrentUser() user: AuthenticatedUser, @RequestId() requestId: string): Promise<LabResponse> {
+    return this.labsService.updateStatus(id, data, user, requestId)
   }
 }

@@ -5,9 +5,10 @@ import { AuthModule } from '../auth/auth.module'
 import { ActiveUserGuard } from './guards/active-user.guard'
 import { UsersController } from './users.controller'
 import { UsersService } from './users.service'
+import { AuditModule } from '../audit/audit.module'
 
 @Module({
-  imports: [forwardRef(() => AuthModule), TypeOrmModule.forFeature([User])],
+  imports: [forwardRef(() => AuthModule), AuditModule, TypeOrmModule.forFeature([User])],
   controllers: [UsersController],
   providers: [UsersService, ActiveUserGuard],
   exports: [UsersService, ActiveUserGuard],

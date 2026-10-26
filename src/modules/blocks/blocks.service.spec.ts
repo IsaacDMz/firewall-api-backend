@@ -1,6 +1,9 @@
 import { jest } from '@jest/globals'
 import { BlocksService } from './blocks.service'
 
+const actor = { id: '0aabce83-c7eb-4df6-a509-5722fc599339', username: 'admin', role: 'ADMIN' as const }
+const auditService = { record: jest.fn(async () => undefined) }
+
 const block = {
   id: 'faabce83-c7eb-4df6-a509-5722fc599339',
   name: 'Bloco A',
@@ -13,9 +16,9 @@ describe('BlocksService', () => {
       create: jest.fn((data) => data),
       save: jest.fn(async (data) => ({ ...block, ...data })),
     }
-    const service = new BlocksService(blocksRepository as never, {} as never)
+    const service = new BlocksService(blocksRepository as never, {} as never, auditService as never)
 
-    await expect(service.create({ name: block.name })).resolves.toEqual({
+    await expect(service.create({ name: block.name }, actor, '1aabce83-c7eb-4df6-a509-5722fc599339')).resolves.toEqual({
       id: block.id,
       name: block.name,
       createdAt: block.createdAt,
@@ -24,7 +27,7 @@ describe('BlocksService', () => {
 
   it('lists blocks ordered by name', async () => {
     const blocksRepository = { find: jest.fn(async () => [block]) }
-    const service = new BlocksService(blocksRepository as never, {} as never)
+    const service = new BlocksService(blocksRepository as never, {} as never, auditService as never)
 
     await expect(service.findAll()).resolves.toHaveLength(1)
     expect(blocksRepository.find).toHaveBeenCalledWith({ order: { name: 'ASC' } })
@@ -33,9 +36,9 @@ describe('BlocksService', () => {
   it('does not remove a block that is in use by a lab', async () => {
     const blocksRepository = { findOneBy: jest.fn(async () => block), remove: jest.fn() }
     const labsRepository = { exists: jest.fn(async () => true) }
-    const service = new BlocksService(blocksRepository as never, labsRepository as never)
+    const service = new BlocksService(blocksRepository as never, labsRepository as never, auditService as never)
 
-    await expect(service.remove(block.id)).rejects.toMatchObject({ response: { code: 'BLOCK_IN_USE' } })
+    await expect(service.remove(block.id, actor, '1aabce83-c7eb-4df6-a509-5722fc599339')).rejects.toMatchObject({ response: { code: 'BLOCK_IN_USE' } })
     expect(blocksRepository.remove).not.toHaveBeenCalled()
   })
 })
