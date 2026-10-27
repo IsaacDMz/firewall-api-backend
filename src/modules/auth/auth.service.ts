@@ -205,7 +205,7 @@ export class AuthService {
   }
 
   private invalidCredentials(): UnauthorizedException {
-    return new UnauthorizedException({ message: 'Invalid credentials', code: 'AUTH_INVALID_CREDENTIALS' })
+    return new UnauthorizedException({ message: 'Usuário ou senha inválidos.', code: 'AUTH_INVALID_CREDENTIALS' })
   }
 
   private invalidRefreshToken(): UnauthorizedException {
