@@ -46,6 +46,31 @@ npm run dev
 
 A API estará em `http://localhost:3000/api` e a documentação Swagger em `http://localhost:3000/api/docs`.
 
+## Listagem de laboratórios
+
+`GET /api/labs` requer `Authorization: Bearer <access_token>` de um professor ou administrador ativo. O parâmetro opcional `blockId` aceita o UUID v4 retornado pela API de blocos:
+
+```http
+GET /api/labs
+GET /api/labs?blockId=faabce83-c7eb-4df6-a509-5722fc599339
+```
+
+Sem o parâmetro, retorna todos os laboratórios. Com `blockId`, retorna somente os laboratórios daquele bloco. A resposta HTTP 200 é sempre um array, ordenado por `name` em ordem crescente, com os mesmos campos:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Lab 1",
+    "block": { "id": "faabce83-c7eb-4df6-a509-5722fc599339", "name": "Bloco A" },
+    "subnet": "192.168.10.0/24",
+    "status": "bloqueado"
+  }
+]
+```
+
+Blocos sem laboratórios (inclusive UUIDs válidos inexistentes) retornam `[]`. Um `blockId` inválido ou vazio retorna HTTP 400 com `{ "message": "blockId must be a UUID", "code": "BAD_REQUEST" }`. A listagem não possui paginação, contagem total ou pesquisa textual.
+
 ## Ativação inicial de usuários
 
 Cadastros públicos sempre criam professores inativos. Após o cadastro, o responsável deve ativar o usuário manualmente:

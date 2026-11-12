@@ -8,6 +8,7 @@ import { FirewallService } from '../firewall/firewall.service'
 import { HistoryService } from '../history/history.service'
 import { AuditService } from '../audit/audit.service'
 import { CreateLabDto } from './dto/create-lab.dto'
+import { ListLabsQueryDto } from './dto/list-labs-query.dto'
 import { UpdateLabStatusDto } from './dto/update-lab-status.dto'
 import { UpdateLabDto } from './dto/update-lab.dto'
 import { LabResponse } from './labs.types'
@@ -23,8 +24,12 @@ export class LabsService {
     private readonly auditService: AuditService,
   ) {}
 
-  async findAll(): Promise<LabResponse[]> {
-    const labs = await this.labsRepository.find({ relations: { block: true }, order: { name: 'ASC' } })
+  async findAll(query: ListLabsQueryDto = {}): Promise<LabResponse[]> {
+    const labs = await this.labsRepository.find({
+      ...(query.blockId !== undefined ? { where: { blockId: query.blockId } } : {}),
+      relations: { block: true },
+      order: { name: 'ASC' },
+    })
     return labs.map((lab) => this.toResponse(lab))
   }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../../common/auth/current-user.decorator'
 import { RequestId } from '../../common/http/request-id.decorator'
@@ -9,6 +9,7 @@ import { RolesGuard } from '../../common/guards/roles.guard'
 import { UserRole } from '../../database/entities/user.entity'
 import { ActiveUserGuard } from '../users/guards/active-user.guard'
 import { CreateLabDto } from './dto/create-lab.dto'
+import { ListLabsQueryDto } from './dto/list-labs-query.dto'
 import { UpdateLabStatusDto } from './dto/update-lab-status.dto'
 import { UpdateLabDto } from './dto/update-lab.dto'
 import { LabsService } from './labs.service'
@@ -23,8 +24,8 @@ export class LabsController {
 
   @Roles(UserRole.PROFESSOR, UserRole.ADMIN)
   @Get()
-  findAll(): Promise<LabResponse[]> {
-    return this.labsService.findAll()
+  findAll(@Query() query: ListLabsQueryDto): Promise<LabResponse[]> {
+    return this.labsService.findAll(query)
   }
 
   @Roles(UserRole.ADMIN)
