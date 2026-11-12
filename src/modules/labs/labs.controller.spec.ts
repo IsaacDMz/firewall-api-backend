@@ -7,6 +7,7 @@ import { FindManyOptions } from 'typeorm'
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import { Lab, LabStatus } from '../../database/entities/lab.entity'
 import { UserRole } from '../../database/entities/user.entity'
+import { FirewallObservation } from '../firewall/firewall.types'
 import { UsersService } from '../users/users.service'
 import { LabsController } from './labs.controller'
 import { LabsService } from './labs.service'
@@ -29,11 +30,13 @@ describe('LabsController listing', () => {
   let app: INestApplication
   const labsRepository = {
     find: jest.fn<(options?: FindManyOptions<Lab>) => Promise<Lab[]>>(),
+    findOneBy: jest.fn(async ({ id }: { id: number }) => (labs.find((lab) => lab.id === id) as Lab | undefined) ?? null),
   }
+  const firewallService = { observeSubnet: jest.fn(async (): Promise<FirewallObservation> => ({ status: 'bloqueado', error: null })) }
   const usersService = { findById: jest.fn(async () => ({ isActive: true })) }
 
   beforeAll(async () => {
-    const service = new LabsService(labsRepository as never, {} as never, {} as never, {} as never, {} as never, {} as never)
+    const service = new LabsService(labsRepository as never, {} as never, {} as never, firewallService as never, {} as never, {} as never)
     const module = await Test.createTestingModule({
       controllers: [LabsController],
       providers: [
@@ -52,6 +55,7 @@ describe('LabsController listing', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     usersService.findById.mockResolvedValue({ isActive: true })
+    firewallService.observeSubnet.mockResolvedValue({ status: 'bloqueado', error: null })
     labsRepository.find.mockImplementation(async (options) => {
       const where = options?.where as { blockId?: string } | undefined
       return labs.filter((lab) => where?.blockId === undefined || lab.blockId === where.blockId).sort((a, b) => a.name.localeCompare(b.name)) as Lab[]
@@ -96,5 +100,61 @@ describe('LabsController listing', () => {
     await request(app.getHttpServer()).get(`/api/labs?blockId=${blockA.id}`).auth('test-token', { type: 'bearer' }).expect(403).expect({ message: 'Account is inactive', code: 'ACCOUNT_INACTIVE' })
 
     expect(labsRepository.find).not.toHaveBeenCalled()
+  })
+
+  it('exposes the consistency check as a read-only authenticated GET', async () => {
+    await request(app.getHttpServer())
+      .get('/api/labs/1/firewall-status')
+      .auth('test-token', { type: 'bearer' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          labId: 1,
+          subnet: '192.168.10.0/24',
+          databaseStatus: 'bloqueado',
+          firewallStatus: 'bloqueado',
+          isSynchronized: true,
+          checkedAt: expect.any(String),
+          error: null,
+        })
+        expect(new Date(body.checkedAt).toISOString()).toBe(body.checkedAt)
+      })
+
+    expect(firewallService.observeSubnet).toHaveBeenCalledWith('192.168.10.0/24')
+  })
+
+  it('returns HTTP 200 with unknown state and a controlled error when the router is inaccessible', async () => {
+    const error = { message: 'Firewall connection failed', code: 'FIREWALL_CONNECTION_FAILED' }
+    firewallService.observeSubnet.mockResolvedValue({ status: 'desconhecido', error })
+
+    await request(app.getHttpServer())
+      .get('/api/labs/1/firewall-status')
+      .auth('test-token', { type: 'bearer' })
+      .expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ firewallStatus: 'desconhecido', isSynchronized: null, error }))
+  })
+
+  it.each([
+    { id: 'invalid', status: 400, code: 'BAD_REQUEST' },
+    { id: '999', status: 404, code: 'LAB_NOT_FOUND' },
+  ])('returns $status for lab ID $id without contacting the firewall', async ({ id, status, code }) => {
+    await request(app.getHttpServer())
+      .get(`/api/labs/${id}/firewall-status`)
+      .auth('test-token', { type: 'bearer' })
+      .expect(status)
+      .expect(({ body }) => expect(body).toMatchObject({ message: expect.any(String), code }))
+
+    expect(firewallService.observeSubnet).not.toHaveBeenCalled()
+  })
+
+  it('requires authentication for consistency checks', async () => {
+    await request(app.getHttpServer()).get('/api/labs/1/firewall-status').expect(401).expect({ message: 'Authentication required', code: 'AUTH_UNAUTHORIZED' })
+    expect(firewallService.observeSubnet).not.toHaveBeenCalled()
+  })
+
+  it('rejects inactive users for consistency checks', async () => {
+    usersService.findById.mockResolvedValue({ isActive: false })
+    await request(app.getHttpServer()).get('/api/labs/1/firewall-status').auth('test-token', { type: 'bearer' }).expect(403).expect({ message: 'Account is inactive', code: 'ACCOUNT_INACTIVE' })
+    expect(firewallService.observeSubnet).not.toHaveBeenCalled()
   })
 })

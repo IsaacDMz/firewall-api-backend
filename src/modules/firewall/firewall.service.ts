@@ -2,6 +2,8 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { validateIpv4Cidr } from '../../common/network/ipv4-cidr'
 import { SshCommandError, SshCommandRunner, SshConnectionError, SshTimeoutError } from './ssh-command-runner'
+import { readFirewallStatus } from './firewall-status'
+import { FirewallObservation } from './firewall.types'
 
 type FirewallOperation = 'block' | 'unblock'
 
@@ -18,6 +20,30 @@ export class FirewallService {
 
   unblockInternet(subnet: string, labId: number): Promise<void> {
     return this.execute('unblock', subnet, labId)
+  }
+
+  async observeSubnet(subnet: string): Promise<FirewallObservation> {
+    if (!validateIpv4Cidr(subnet).valid) {
+      return { status: 'desconhecido', error: { message: 'Firewall request is invalid', code: 'FIREWALL_COMMAND_FAILED' } }
+    }
+
+    try {
+      const wanInterface = this.configService.getOrThrow<string>('firewall.wanInterface')
+      const result = await this.commandRunner.run('/usr/bin/sudo -n /usr/local/sbin/labguard-firewall status')
+      const status = result.stderr.trim() ? 'desconhecido' : readFirewallStatus(result.stdout, subnet, wanInterface)
+      return {
+        status,
+        error: status === 'desconhecido' ? { message: 'Firewall state could not be determined', code: 'FIREWALL_STATE_UNKNOWN' } : null,
+      }
+    } catch (error) {
+      if (error instanceof SshTimeoutError) {
+        return { status: 'desconhecido', error: { message: 'Firewall operation timed out', code: 'FIREWALL_TIMEOUT' } }
+      }
+      if (error instanceof SshConnectionError) {
+        return { status: 'desconhecido', error: { message: 'Firewall connection failed', code: 'FIREWALL_CONNECTION_FAILED' } }
+      }
+      return { status: 'desconhecido', error: { message: 'Firewall command failed', code: 'FIREWALL_COMMAND_FAILED' } }
+    }
   }
 
   private async execute(operation: FirewallOperation, subnet: string, labId: number): Promise<void> {

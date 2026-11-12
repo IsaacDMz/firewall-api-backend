@@ -4,6 +4,7 @@ import { Response } from 'express'
 type ErrorResponse = {
   code?: string
   message?: string | string[]
+  details?: unknown
 }
 
 @Catch()
@@ -17,6 +18,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       message: Array.isArray(body?.message) ? body.message.join(', ') : (body?.message ?? 'Internal server error'),
       code: body?.code ?? HttpStatus[status] ?? 'INTERNAL_SERVER_ERROR',
+      ...(body?.details !== undefined ? { details: body.details } : {}),
     })
   }
 }
